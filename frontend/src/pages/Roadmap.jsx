@@ -80,7 +80,7 @@ export default function Roadmap() {
 
   useEffect(() => {
     if (!roadmapId) return
-    axios.get(`http://localhost:8000/progress/${roadmapId}`)
+    axios.get(`${API_BASE_URL}/progress/${roadmapId}`)
       .then(res => {
         const rows = res.data?.progress ?? []
         const map = {}

@@ -89,7 +89,7 @@ export default function ExperienceOnboarding() {
     setSuggestError(null)
     try {
       const skills = skillsInput.split(',').map(s => s.trim()).filter(Boolean)
-      const res = await axios.post('http://localhost:8000/suggest-roles', { skills })
+      const res = await axios.post(API_BASE_URL + '/suggest-roles', { skills })
       const roles = Array.isArray(res.data) ? res.data : (res.data.roles ?? [])
       setSuggestions(roles)
       setSelectedRole(null)
@@ -115,7 +115,7 @@ export default function ExperienceOnboarding() {
         user_id: user?.id ?? null,
         pathway_type: 'role',
       }
-      const res = await axios.post('http://localhost:8000/generate-roadmap', requestBody)
+      const res = await axios.post(API_BASE_URL + '/generate-roadmap', requestBody)
       if (user?.id) {
         try {
           sessionStorage.setItem(

@@ -44,7 +44,7 @@ export default function Navbar() {
     if (!user?.id) { setAllPathways([]); return }
 
     function fetchPathways() {
-      axios.get(`http://localhost:8000/roadmaps?user_id=${user.id}`, { timeout: 5000 })
+      axios.get(`${API_BASE_URL}/roadmaps?user_id=${user.id}`, { timeout: 5000 })
         .then(res => setAllPathways(res.data?.roadmaps ?? []))
         .catch(() => {})
     }
@@ -86,7 +86,7 @@ export default function Navbar() {
     setActivatingId(pathway.id)
     try {
       const res = await axios.post(
-        `http://localhost:8000/roadmaps/${pathway.id}/set-active`,
+        `${API_BASE_URL}/roadmaps/${pathway.id}/set-active`,
         { user_id: user.id },
       )
       const full = res.data
@@ -134,7 +134,7 @@ export default function Navbar() {
   async function deletePathway(pathway) {
     try {
       const res = await axios.delete(
-        `http://localhost:8000/roadmaps/${pathway.id}`,
+        `${API_BASE_URL}/roadmaps/${pathway.id}`,
         { data: { user_id: user.id } },
       )
       const { new_active_id, was_active } = res.data

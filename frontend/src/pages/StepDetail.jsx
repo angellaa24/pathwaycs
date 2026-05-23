@@ -168,7 +168,7 @@ export default function StepDetail() {
     setChatLoading(true)
     try {
       const history = chatMessages.map(m => ({ role: m.role, content: m.content }))
-      const res = await axios.post('http://localhost:8000/chat', {
+      const res = await axios.post(API_BASE_URL + '/chat', {
         message: text,
         step_title: step?.title ?? '',
         step_description: step?.description ?? '',
@@ -191,7 +191,7 @@ export default function StepDetail() {
   // Always sync from Supabase when this step is viewed so the button reflects real state.
   useEffect(() => {
     if (!roadmapId) return
-    axios.get(`http://localhost:8000/progress/${roadmapId}`)
+    axios.get(`${API_BASE_URL}/progress/${roadmapId}`)
       .then(res => {
         const rows = res.data?.progress ?? []
         const map = {}
@@ -212,9 +212,9 @@ export default function StepDetail() {
     setMarking(true)
     setError(null)
     try {
-      await axios.post(`http://localhost:8000/progress/${roadmapId}/${step.step}`)
+      await axios.post(`${API_BASE_URL}/progress/${roadmapId}/${step.step}`)
       // Re-fetch from Supabase so localCompleted reflects the real persisted state.
-      const res = await axios.get(`http://localhost:8000/progress/${roadmapId}`)
+      const res = await axios.get(`${API_BASE_URL}/progress/${roadmapId}`)
       const rows = res.data?.progress ?? []
       const map = {}
       rows.forEach(row => { if (row.completed) map[row.step_number] = true })

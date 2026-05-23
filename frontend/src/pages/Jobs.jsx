@@ -96,7 +96,7 @@ export default function Jobs() {
     setLoading(true)
     setSearched(true)
     try {
-      const res = await axios.get('http://localhost:8000/job-listings', {
+      const res = await axios.get(API_BASE_URL + '/job-listings', {
         params: { target_role: role, job_level: level },
       })
       setListings(res.data.listings ?? [])

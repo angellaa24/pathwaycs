@@ -165,7 +165,7 @@ export default function Explore() {
     setQuizError(null)
     setQuizResults(null)
     try {
-      const { data } = await axios.post('http://localhost:8000/suggest-roles', {
+      const { data } = await axios.post(API_BASE_URL + '/suggest-roles', {
         enjoys,
         strongest_skill: skill.trim() || null,
         career_priority: priority,

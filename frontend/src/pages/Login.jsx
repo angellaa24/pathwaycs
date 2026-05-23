@@ -54,7 +54,7 @@ export default function Login() {
       if (pendingRoadmap?.roadmap_id && userId) {
         try {
           await axios.post(
-            `http://localhost:8000/roadmaps/${pendingRoadmap.roadmap_id}/claim`,
+            `${API_BASE_URL}/roadmaps/${pendingRoadmap.roadmap_id}/claim`,
             { user_id: userId },
           )
         } catch { /* non-fatal — roadmap is still accessible */ }

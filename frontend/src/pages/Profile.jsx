@@ -128,7 +128,7 @@ export default function Profile() {
   async function handleDelete() {
     setDeleteLoading(true); setDeleteErr(null)
     try {
-      await axios.delete('http://localhost:8000/auth/account', { data: { user_id: user.id } })
+      await axios.delete(API_BASE_URL + '/auth/account', { data: { user_id: user.id } })
       localStorage.removeItem('sb-tmnmumbqeppoffkxmuvw-auth-token')
       localStorage.removeItem('pathwaycs-avatar-character')
       localStorage.removeItem('pathwaycs-avatar-color')

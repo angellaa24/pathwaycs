@@ -52,7 +52,7 @@ export default function BeginnerOnboarding() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axios.post('http://localhost:8000/generate-roadmap', {
+      const res = await axios.post(API_BASE_URL + '/generate-roadmap', {
         current_skills: [],
         target_role: answers[0],
         job_level: 'intern',

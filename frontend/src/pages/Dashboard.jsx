@@ -203,7 +203,7 @@ export default function Dashboard() {
       console.log('[Dashboard] Fetching progress for roadmap', roadmap.id)
       try {
         const res = await axios.get(
-          `http://localhost:8000/progress/${roadmap.id}`,
+          `${API_BASE_URL}/progress/${roadmap.id}`,
           { timeout: 8000 },
         )
         const rows = res.data?.progress ?? []
@@ -231,7 +231,7 @@ export default function Dashboard() {
       console.log('[Dashboard] Fetching market skills for', role)
       try {
         const res = await axios.get(
-          'http://localhost:8000/jobs',
+          API_BASE_URL + '/jobs',
           { params: { target_role: role }, timeout: 15000 },
         )
         const skills = res.data.top_skills?.slice(0, 10) ?? []
@@ -271,7 +271,7 @@ export default function Dashboard() {
     if (!roadmap?.id) return
     function onVisible() {
       if (document.visibilityState !== 'visible') return
-      axios.get(`http://localhost:8000/progress/${roadmap.id}`, { timeout: 8000 })
+      axios.get(`${API_BASE_URL}/progress/${roadmap.id}`, { timeout: 8000 })
         .then(res => {
           const rows = res.data?.progress ?? []
           const map = {}
@@ -333,12 +333,12 @@ export default function Dashboard() {
   async function switchToRolePathway() {
     if (!user?.id) return
     try {
-      const res = await axios.get(`http://localhost:8000/roadmaps?user_id=${user.id}`, { timeout: 5000 })
+      const res = await axios.get(`${API_BASE_URL}/roadmaps?user_id=${user.id}`, { timeout: 5000 })
       const pathways = res.data?.roadmaps ?? []
       const rolePathway = pathways.find(p => (p.pathway_type ?? 'role') === 'role')
       if (rolePathway) {
         const active = await axios.post(
-          `http://localhost:8000/roadmaps/${rolePathway.id}/set-active`,
+          `${API_BASE_URL}/roadmaps/${rolePathway.id}/set-active`,
           { user_id: user.id },
         )
         const full = active.data

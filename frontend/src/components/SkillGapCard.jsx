@@ -134,7 +134,7 @@ export default function SkillGapCard({
     const missingSkills = marketSkills.filter(s => !checkedSkills.has(s))
     setGenerating(true)
     try {
-      const res = await axios.post('http://localhost:8000/generate-roadmap', {
+      const res = await axios.post(API_BASE_URL + '/generate-roadmap', {
         current_skills: Array.from(checkedSkills),
         target_role:    targetRole,
         job_level:      (jobLevel ?? 'mid-level').toLowerCase(),

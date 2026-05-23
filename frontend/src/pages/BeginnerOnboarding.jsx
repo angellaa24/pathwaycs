@@ -51,25 +51,39 @@ export default function BeginnerOnboarding() {
     if (loading || !answers[currentStep]) return
     setLoading(true)
     setError(null)
-    try {
-      const res = await axios.post(API_BASE_URL + '/generate-roadmap', {
-        current_skills: [],
-        target_role: answers[0],
-        job_level: 'intern',
-        user_id: user?.id ?? null,
-      })
-      navigate('/roadmap', {
-        state: {
-          ...res.data,
-          roadmap_id: res.data.roadmap_id,
-          track: 'beginner',
-        },
-      })
-    } catch (err) {
-      console.error('[generate-roadmap]', err.response?.data || err.message)
-      setError('Something went wrong. Please try again.')
-      setLoading(false)
+
+    const requestBody = {
+      current_skills: [],
+      target_role: answers[0],
+      job_level: 'intern',
+      user_id: user?.id ?? null,
     }
+
+    let res
+    try {
+      res = await axios.post(API_BASE_URL + '/generate-roadmap', requestBody)
+    } catch {
+      setError('This is taking longer than usual, please wait…')
+      await new Promise(r => setTimeout(r, 3000))
+      try {
+        res = await axios.post(API_BASE_URL + '/generate-roadmap', requestBody)
+      } catch (err) {
+        console.error('[generate-roadmap]', err.response?.data || err.message)
+        setError('Something went wrong. Please try again.')
+        setLoading(false)
+        return
+      }
+    }
+
+    setError(null)
+    navigate('/roadmap', {
+      state: {
+        ...res.data,
+        roadmap_id: res.data.roadmap_id,
+        track: 'beginner',
+      },
+    })
+    setLoading(false)
   }
 
   const containerStyle = {

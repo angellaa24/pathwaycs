@@ -28,8 +28,19 @@ const NO_NAV = new Set(['/', '/login', '/signup'])
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  console.log('[ProtectedRoute] auth resolved — user:', user?.email ?? null)
   return user ? children : <Navigate to="/login" replace />
+}
+
+// Like ProtectedRoute but also allows guest users through if they carry
+// roadmap data in location.state (e.g. just finished onboarding).
+function RoadmapRoute({ children }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  if (loading) return <LoadingScreen />
+  if (user) return children
+  // Guest with freshly generated roadmap — let them see it
+  if (location.state?.steps) return children
+  return <Navigate to="/login" replace />
 }
 
 function AppRoutes() {
@@ -55,7 +66,7 @@ function AppRoutes() {
 
         {/* ── Protected routes ─────────────────────────────────────────── */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/roadmap"   element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
+        <Route path="/roadmap"   element={<RoadmapRoute><Roadmap /></RoadmapRoute>} />
         <Route path="/profile"   element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/avatar"    element={<ProtectedRoute><AvatarPicker /></ProtectedRoute>} />
         <Route path="/explore"   element={<ProtectedRoute><Explore /></ProtectedRoute>} />

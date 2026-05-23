@@ -106,48 +106,60 @@ export default function ExperienceOnboarding() {
     if (!effectiveRole) return
     setGenerateLoading(true)
     setGenerateError(null)
-    try {
-      const current_skills = skillsInput.split(',').map(s => s.trim()).filter(Boolean)
-      const requestBody = {
-        current_skills,
-        target_role: effectiveRole,
-        job_level: jobLevel.toLowerCase(),
-        user_id: user?.id ?? null,
-        pathway_type: 'role',
-      }
-      const res = await axios.post(API_BASE_URL + '/generate-roadmap', requestBody)
-      if (user?.id) {
-        try {
-          sessionStorage.setItem(
-            `pathwaycs-roadmap-${user.id}`,
-            JSON.stringify({
-              ts: Date.now(),
-              data: {
-                id:            res.data.roadmap_id,
-                steps:         res.data.steps,
-                target_role:   res.data.target_role ?? effectiveRole,
-                job_level:     res.data.job_level   ?? jobLevel,
-                current_skills: current_skills,
-                pathway_type:  'role',
-              },
-            }),
-          )
-        } catch {}
-      }
-      window.dispatchEvent(new CustomEvent('pathwaycs:pathways-changed'))
-      navigate('/roadmap', {
-        state: {
-          ...res.data,
-          roadmap_id: res.data.roadmap_id,
-          track: 'experience',
-        },
-      })
-    } catch (error) {
-      console.error('[generate-roadmap] error:', error.response?.data || error.message)
-      setGenerateError('Something went wrong. Please try again.')
-    } finally {
-      setGenerateLoading(false)
+
+    const current_skills = skillsInput.split(',').map(s => s.trim()).filter(Boolean)
+    const requestBody = {
+      current_skills,
+      target_role: effectiveRole,
+      job_level: jobLevel.toLowerCase(),
+      user_id: user?.id ?? null,
+      pathway_type: 'role',
     }
+
+    let res
+    try {
+      res = await axios.post(API_BASE_URL + '/generate-roadmap', requestBody)
+    } catch {
+      setGenerateError('This is taking longer than usual, please wait…')
+      await new Promise(r => setTimeout(r, 3000))
+      try {
+        res = await axios.post(API_BASE_URL + '/generate-roadmap', requestBody)
+      } catch (err) {
+        console.error('[generate-roadmap] error:', err.response?.data || err.message)
+        setGenerateError('Something went wrong. Please try again.')
+        setGenerateLoading(false)
+        return
+      }
+    }
+
+    setGenerateError(null)
+    if (user?.id) {
+      try {
+        sessionStorage.setItem(
+          `pathwaycs-roadmap-${user.id}`,
+          JSON.stringify({
+            ts: Date.now(),
+            data: {
+              id:            res.data.roadmap_id,
+              steps:         res.data.steps,
+              target_role:   res.data.target_role ?? effectiveRole,
+              job_level:     res.data.job_level   ?? jobLevel,
+              current_skills: current_skills,
+              pathway_type:  'role',
+            },
+          }),
+        )
+      } catch {}
+    }
+    window.dispatchEvent(new CustomEvent('pathwaycs:pathways-changed'))
+    navigate('/roadmap', {
+      state: {
+        ...res.data,
+        roadmap_id: res.data.roadmap_id,
+        track: 'experience',
+      },
+    })
+    setGenerateLoading(false)
   }
 
   // ── Styles ────────────────────────────────────────────────────────────────

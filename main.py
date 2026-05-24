@@ -21,6 +21,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "https://pathwaycs.vercel.app",
+        "https://pathwaycs-git-main-angellaa24s-projects.vercel.app",
     ],
     allow_methods=["*"],
     allow_headers=["*"],

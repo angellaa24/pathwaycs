@@ -150,11 +150,22 @@ export default function StepDetail() {
   const [celebrating,   setCelebrating]   = useState(false)
   const [error,         setError]         = useState(null)
 
+  const [chatOpen,      setChatOpen]      = useState(
+    () => localStorage.getItem('pathwaycs-chat-open') === 'true'
+  )
   const [chatMessages,  setChatMessages]  = useState([])
   const [chatInput,     setChatInput]     = useState('')
   const [chatLoading,   setChatLoading]   = useState(false)
   const scrollAnchorRef = useRef(null)
   const chatInputRef    = useRef(null)
+
+  function toggleChat() {
+    setChatOpen(prev => {
+      const next = !prev
+      localStorage.setItem('pathwaycs-chat-open', String(next))
+      return next
+    })
+  }
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -551,8 +562,43 @@ export default function StepDetail() {
 
         {/* ── Section 4: Ask AI Tutor ──────────────────────────────────── */}
         <section>
-          <SectionHead label="Ask AI Tutor" T={T} />
-          <div style={{
+          {/* Collapsible header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: chatOpen ? 12 : 0 }}>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+            <button
+              onClick={toggleChat}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 18px', borderRadius: 999,
+                background: T.chipBg, border: `1.5px solid ${T.chipBorder}`,
+                cursor: 'pointer', fontFamily: FF,
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              <span style={{
+                fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+                textTransform: 'uppercase', color: T.chipText, whiteSpace: 'nowrap',
+              }}>
+                Ask AI Tutor
+              </span>
+              <svg
+                width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke={T.chipText} strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round"
+                style={{
+                  transition: 'transform 0.2s',
+                  transform: chatOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+          </div>
+
+          {chatOpen && <div style={{
             background: T.chatBg,
             border: `1.5px solid ${T.chatBorder}`,
             borderRadius: 16, overflow: 'hidden',
@@ -736,7 +782,7 @@ export default function StepDetail() {
                 </svg>
               </button>
             </div>
-          </div>
+          </div>}
         </section>
 
         {/* ── Error ─────────────────────────────────────────────────────── */}

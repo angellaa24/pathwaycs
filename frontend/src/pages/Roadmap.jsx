@@ -111,9 +111,12 @@ export default function Roadmap() {
     if (!user?.id) return
     function onPathwayChanged() {
       try {
-        const raw = sessionStorage.getItem(`pathwaycs-roadmap-${user.id}`)
+        const raw = localStorage.getItem('pathwaycs-active-roadmap')
+          ?? sessionStorage.getItem(`pathwaycs-roadmap-${user.id}`)
         if (!raw) return
-        const { data } = JSON.parse(raw)
+        const parsed = JSON.parse(raw)
+        // localStorage stores the object directly; sessionStorage wraps it in { data }
+        const data = parsed?.steps ? parsed : parsed?.data
         if (data?.id && data?.steps?.length) {
           setRoadmapData({
             steps:        data.steps,
@@ -122,7 +125,7 @@ export default function Roadmap() {
             job_level:    data.job_level,
             pathway_type: data.pathway_type ?? 'role',
           })
-          setCompleted({})  // reset — progress fetch fires via roadmapId change
+          setCompleted({})
           setFetchingRoadmap(false)
         }
       } catch {}
@@ -145,7 +148,27 @@ export default function Roadmap() {
       return
     }
 
-    // Fast path: use Dashboard's cached roadmap if available
+    // Primary fast path: localStorage
+    try {
+      const raw = localStorage.getItem('pathwaycs-active-roadmap')
+      if (raw) {
+        const data = JSON.parse(raw)
+        if (data?.steps?.length) {
+          console.log('[Roadmap] Loaded from localStorage — steps:', data.steps.length)
+          setRoadmapData({
+            steps:        data.steps,
+            roadmap_id:   data.id,
+            target_role:  data.target_role,
+            job_level:    data.job_level,
+            pathway_type: data.pathway_type ?? 'role',
+          })
+          setFetchingRoadmap(false)
+          return
+        }
+      }
+    } catch {}
+
+    // Secondary fast path: sessionStorage
     const cacheKey = `pathwaycs-roadmap-${user.id}`
     try {
       const raw = sessionStorage.getItem(cacheKey)
@@ -166,42 +189,58 @@ export default function Roadmap() {
       }
     } catch {}
 
-    // Slow path: cache miss — fetch from Supabase
+    // Slow path: cache miss — direct REST fetch, bypasses Supabase JS client
     console.log('[Roadmap] No cache — fetching roadmap for user', user.id)
-    async function fetchRoadmap() {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    const REST_HEADERS = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+    }
+    const SELECT = 'id,steps,target_role,job_level,pathway_type'
+
+    async function restFetch(extraParams) {
+      const url = `${SUPABASE_URL}/rest/v1/roadmaps?select=${SELECT}&user_id=eq.${user.id}&${extraParams}`
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 5000)
       try {
-        // Prefer active pathway; fall back to most recent for pre-migration rows
-        let { data: rows, error } = await supabase
-          .from('roadmaps')
-          .select('id, steps, target_role, job_level, pathway_type')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .limit(1)
-        if (error) { console.error('[Roadmap] Fallback fetch error:', error.message) }
-        if (!rows?.length) {
-          const fb = await supabase
-            .from('roadmaps')
-            .select('id, steps, target_role, job_level, pathway_type')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-          rows = fb.data
+        const res = await fetch(url, { headers: REST_HEADERS, signal: controller.signal })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return await res.json()
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
+    async function fetchRoadmap() {
+      let rows
+      try {
+        rows = await restFetch('is_active=eq.true&order=created_at.desc&limit=1')
+        console.log('[Roadmap] Active fetch result:', rows)
+      } catch (e) {
+        console.warn('[Roadmap] Active fetch timed out or failed:', e.message)
+      }
+      if (!rows?.length) {
+        try {
+          rows = await restFetch('order=created_at.desc&limit=1')
+          console.log('[Roadmap] Fallback fetch result:', rows)
+        } catch (e) {
+          console.warn('[Roadmap] Fallback fetch timed out or failed:', e.message)
         }
-        if (rows?.length) {
-          const rm = rows[0]
-          console.log('[Roadmap] Fallback fetch success — id:', rm.id, 'steps:', rm.steps?.length ?? 0)
-          setRoadmapData({
-            steps:        rm.steps,
-            roadmap_id:   rm.id,
-            target_role:  rm.target_role,
-            job_level:    rm.job_level,
-            pathway_type: rm.pathway_type ?? 'role',
-          })
-        } else {
-          console.log('[Roadmap] Fallback fetch returned no rows for user', user.id)
-        }
-      } catch (err) {
-        console.error('[Roadmap] Fallback fetch threw:', err?.message)
+      }
+      if (rows?.length) {
+        const rm = rows[0]
+        console.log('[Roadmap] Fetch success — id:', rm.id, 'steps:', rm.steps?.length ?? 0)
+        try { localStorage.setItem('pathwaycs-active-roadmap', JSON.stringify(rm)) } catch {}
+        setRoadmapData({
+          steps:        rm.steps,
+          roadmap_id:   rm.id,
+          target_role:  rm.target_role,
+          job_level:    rm.job_level,
+          pathway_type: rm.pathway_type ?? 'role',
+        })
+      } else {
+        console.log('[Roadmap] Fetch returned no rows for user', user.id)
       }
       setFetchingRoadmap(false)
     }

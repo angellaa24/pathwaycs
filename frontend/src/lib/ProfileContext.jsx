@@ -68,10 +68,7 @@ export function ProfileProvider({ children }) {
           console.log('Profile fetch triggered by: login')
           await fetchProfile(session.user.id)
         } else if (event === 'SIGNED_OUT') {
-          localStorage.removeItem('pathwaycs-avatar-character')
-          localStorage.removeItem('pathwaycs-avatar-color')
-          setAvatarCharacter('owly')
-          setAvatarColor('indigo')
+          // Keep avatar keys in localStorage so they load immediately on next login
           setUserId(null)
           setProfileLoaded(true)
         }

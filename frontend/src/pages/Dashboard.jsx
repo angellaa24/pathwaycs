@@ -65,8 +65,9 @@ export default function Dashboard() {
   }
 
   // Phase 1 state — gates the initial render
-  const [roadmap,  setRoadmap]  = useState(null)
-  const [loading,  setLoading]  = useState(true)
+  const [roadmap,       setRoadmap]       = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [fetchTimedOut, setFetchTimedOut] = useState(false)
 
   // Phase 2 state — fills in after the page is visible
   const [progress,      setProgress]      = useState({})
@@ -87,12 +88,14 @@ export default function Dashboard() {
     if (!user?.id) return
     function onPathwayChanged() {
       try {
-        const raw = sessionStorage.getItem(`pathwaycs-roadmap-${user.id}`)
+        const raw = localStorage.getItem('pathwaycs-active-roadmap')
+          ?? sessionStorage.getItem(`pathwaycs-roadmap-${user.id}`)
         if (!raw) return
-        const { data } = JSON.parse(raw)
+        const parsed = JSON.parse(raw)
+        const data = parsed?.steps ? parsed : parsed?.data
         if (data?.id) {
           setRoadmap(data)
-          setProgress({})       // reset so Phase-2 re-fetches for the new roadmap
+          setProgress({})
           setMarketSkills([])
           setSkillsLoading(true)
         }
@@ -106,89 +109,103 @@ export default function Dashboard() {
   useEffect(() => {
     if (authLoading || !user) return
 
+    console.log('Dashboard mount - user ID:', user.id)
+
     let mounted = true
     const cacheKey = `pathwaycs-roadmap-${user.id}`
 
-    // Fast path: serve from sessionStorage and render immediately
+    // Primary fast path: localStorage (survives page reloads, no Supabase needed)
     let servedFromCache = false
     try {
-      const raw = sessionStorage.getItem(cacheKey)
+      const raw = localStorage.getItem('pathwaycs-active-roadmap')
       if (raw) {
-        const { ts, data } = JSON.parse(raw)
-        if (Date.now() - ts < ROADMAP_CACHE_TTL) {
-          servedFromCache = true
+        const data = JSON.parse(raw)
+        if (data?.steps?.length) {
+          console.log('[Dashboard] Roadmap from localStorage — rendering immediately')
           setRoadmap(data)
           setLoading(false)
-          console.log('[Dashboard] Roadmap from cache — rendering immediately')
+          servedFromCache = true
         }
       }
     } catch {}
 
-    // Always fetch fresh — primary on cache miss, silent refresh on cache hit.
-    // Query active pathway first; fall back to most recent if none has is_active=true
-    // (handles existing users whose roadmaps predate the is_active column).
-    const FETCH_TIMEOUT = 6000
-    const timeout = (ms) => new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), ms)
-    )
+    // Secondary fast path: sessionStorage (written by pathway switcher)
+    if (!servedFromCache) {
+      try {
+        const raw = sessionStorage.getItem(cacheKey)
+        if (raw) {
+          const { ts, data } = JSON.parse(raw)
+          if (Date.now() - ts < ROADMAP_CACHE_TTL && data?.steps?.length) {
+            console.log('[Dashboard] Roadmap from sessionStorage — rendering immediately')
+            setRoadmap(data)
+            setLoading(false)
+            servedFromCache = true
+          }
+        }
+      } catch {}
+    }
+
+    // Background REST fetch — bypasses Supabase JS client (which hangs in prod).
+    // Updates cache silently; if both queries time out the cached version stays visible.
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    const REST_HEADERS = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+    }
+    const SELECT = 'id,steps,target_role,job_level,current_skills,pathway_type,created_at'
+
+    async function restFetch(extraParams) {
+      const url = `${SUPABASE_URL}/rest/v1/roadmaps?select=${SELECT}&user_id=eq.${user.id}&${extraParams}`
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 5000)
+      try {
+        const res = await fetch(url, { headers: REST_HEADERS, signal: controller.signal })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return await res.json()
+      } finally {
+        clearTimeout(timer)
+      }
+    }
 
     async function fetchFreshRoadmap() {
+      console.log('Fetching roadmap for user:', user.id)
+      let rows
+
+      // Primary: active pathway
       try {
-        let rows
+        rows = await restFetch('is_active=eq.true&order=created_at.desc&limit=1')
+        console.log('Roadmap query result:', rows)
+      } catch (e) {
+        console.warn('[Dashboard] Active roadmap fetch timed out or failed:', e.message)
+      }
+
+      // Fallback: most recent (for users who predate the is_active column)
+      if (!rows?.length) {
+        console.log('[Dashboard] No active roadmap — trying fallback (most recent)')
         try {
-          const result = await Promise.race([
-            supabase
-              .from('roadmaps')
-              .select('id, steps, target_role, job_level, current_skills, pathway_type, created_at')
-              .eq('user_id', user.id)
-              .eq('is_active', true)
-              .limit(1),
-            timeout(FETCH_TIMEOUT),
-          ])
-          if (result.error) {
-            console.error('[Dashboard] Roadmap query error:', result.error.message)
-          } else {
-            rows = result.data
-          }
+          rows = await restFetch('order=created_at.desc&limit=1')
+          console.log('Roadmap query result (fallback):', rows)
         } catch (e) {
-          console.log('[Dashboard] Roadmap active fetch skipped:', e.message)
+          console.warn('[Dashboard] Fallback roadmap fetch timed out or failed:', e.message)
         }
+      }
 
-        // Fallback for users whose roadmaps predate the is_active column
-        if (!rows?.length) {
-          try {
-            const fb = await Promise.race([
-              supabase
-                .from('roadmaps')
-                .select('id, steps, target_role, job_level, current_skills, pathway_type, created_at')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(1),
-              timeout(FETCH_TIMEOUT),
-            ])
-            rows = fb.data
-          } catch (e) {
-            console.log('[Dashboard] Roadmap fallback fetch skipped:', e.message)
-          }
-        }
+      if (!mounted) return
+      if (rows?.length) {
+        console.log('[Dashboard] REST returned roadmap:', rows[0].id, rows[0].target_role)
+        setRoadmap(rows[0])
+        try { localStorage.setItem('pathwaycs-active-roadmap', JSON.stringify(rows[0])) } catch {}
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: rows[0] })) } catch {}
+      } else {
+        console.log('No roadmap found for user', user.id)
+        if (!servedFromCache) setFetchTimedOut(true)
+      }
 
-        if (!mounted) return
-        console.log('[Dashboard] Roadmap fetch complete —', rows?.length ?? 0, 'rows')
-        if (rows?.length) {
-          setRoadmap(rows[0])
-          try {
-            sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: rows[0] }))
-          } catch {}
-        }
-      } catch (err) {
-        if (!mounted) return
-        console.error('[Dashboard] Roadmap fetch rejected:', err?.message)
-      } finally {
-        if (!mounted) return
-        if (!servedFromCache) {
-          setLoading(false)
-          console.log('[Dashboard] Phase 1 complete — page rendering')
-        }
+      if (!mounted) return
+      if (!servedFromCache) {
+        setLoading(false)
+        console.log('[Dashboard] Phase 1 complete — page rendering')
       }
     }
     fetchFreshRoadmap()
@@ -462,6 +479,18 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <PillButton onClick={goToRoadmap}>Continue Learning →</PillButton>
+              </>
+            ) : fetchTimedOut ? (
+              <>
+                <p style={{ margin: 0, fontSize: 14, color: D.textSub, lineHeight: 1.5 }}>
+                  Having trouble loading your pathway.
+                </p>
+                <PillButton onClick={() => {
+                  localStorage.removeItem('pathwaycs-active-roadmap')
+                  window.location.href = '/login'
+                }}>
+                  Click to reconnect
+                </PillButton>
               </>
             ) : (
               <>

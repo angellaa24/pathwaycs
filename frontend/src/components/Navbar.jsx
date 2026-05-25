@@ -96,20 +96,19 @@ export default function Navbar() {
       // Write the new active pathway into the dashboard cache so the dashboard
       // renders it instantly on the next visit — never leave the cache empty
       // (an empty cache causes a Supabase fetch that may hang in this env).
+      const activeData = {
+        id:             full.id,
+        steps:          full.steps,
+        target_role:    full.target_role,
+        job_level:      full.job_level,
+        current_skills: full.current_skills ?? [],
+        pathway_type:   full.pathway_type ?? 'role',
+      }
+      try { localStorage.setItem('pathwaycs-active-roadmap', JSON.stringify(activeData)) } catch {}
       try {
         sessionStorage.setItem(
           `pathwaycs-roadmap-${user.id}`,
-          JSON.stringify({
-            ts: Date.now(),
-            data: {
-              id:            full.id,
-              steps:         full.steps,
-              target_role:   full.target_role,
-              job_level:     full.job_level,
-              current_skills: full.current_skills ?? [],
-              pathway_type:  full.pathway_type ?? 'role',
-            },
-          }),
+          JSON.stringify({ ts: Date.now(), data: activeData }),
         )
       } catch {}
 
@@ -297,9 +296,8 @@ export default function Navbar() {
                     hoverBg={dropHover} textColor={textColor}
                     onClick={() => {
                       localStorage.removeItem('sb-tmnmumbqeppoffkxmuvw-auth-token')
-                      localStorage.removeItem('pathwaycs-avatar-character')
-                      localStorage.removeItem('pathwaycs-avatar-color')
                       localStorage.removeItem('pathwaycs-darkmode')
+                      localStorage.removeItem('pathwaycs-active-roadmap')
                       window.location.href = '/'
                     }}
                   >

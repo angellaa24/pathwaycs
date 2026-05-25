@@ -134,21 +134,20 @@ export default function ExperienceOnboarding() {
     }
 
     setGenerateError(null)
+    const roadmapData = {
+      id:             res.data.roadmap_id,
+      steps:          res.data.steps,
+      target_role:    res.data.target_role ?? effectiveRole,
+      job_level:      res.data.job_level   ?? jobLevel,
+      current_skills: current_skills,
+      pathway_type:   'role',
+    }
+    try { localStorage.setItem('pathwaycs-active-roadmap', JSON.stringify(roadmapData)) } catch {}
     if (user?.id) {
       try {
         sessionStorage.setItem(
           `pathwaycs-roadmap-${user.id}`,
-          JSON.stringify({
-            ts: Date.now(),
-            data: {
-              id:            res.data.roadmap_id,
-              steps:         res.data.steps,
-              target_role:   res.data.target_role ?? effectiveRole,
-              job_level:     res.data.job_level   ?? jobLevel,
-              current_skills: current_skills,
-              pathway_type:  'role',
-            },
-          }),
+          JSON.stringify({ ts: Date.now(), data: roadmapData }),
         )
       } catch {}
     }
